@@ -24,7 +24,7 @@
     
         .input-group input[type="text"], .input-group input[type="number"] { height: 40px; width: 175px; margin-right: 5px; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; transition: border-color 0.2s; }
         .input-group input[type="text"]:focus, .input-group input[type="number"]:focus { border-color: #2d8a4e; outline: none; }
-        
+    
         .tool-card button { background: #2d8a4e; color: #fff; border: none; padding: 10px; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; width: 100%; }
         .tool-card button:hover { background: #1a6a3a; }
     
@@ -106,7 +106,8 @@
                 if (!UI_LABELS[key]) continue;
                 
                 const fieldInfo = UI_LABELS[key];
-                const widthClass = Object.keys(tool.args).length === 1 ? 'full-width' : '';
+                // const widthClass = Object.keys(tool.args).length === 1 ? 'full-width' : '';
+                const widthClass = '';
                 
                 if (fieldInfo.type === 'tafsir_multiple' || fieldInfo.type === 'tafsir_single') {
                     let optionsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-right: 115px; width: 100%;">`;
