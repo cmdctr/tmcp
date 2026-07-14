@@ -7,7 +7,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev"
-  }
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
