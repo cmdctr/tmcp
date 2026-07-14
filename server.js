@@ -184,3 +184,5 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Stateless Tafsir Proxy running on port ${PORT}`);
 });
+
+export default app;
