@@ -1,15 +1,11 @@
-// server.js - Web-Ready Stateless Proxy
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
-const app = express();
-// Use the hosting provider's port if available, otherwise default to 3000
-const PORT = process.env.PORT || 3000;
+const app = new Hono();
 const MCP_ENDPOINT = 'https://mcp.tafsir.net/mcp';
 
-app.use(cors());
-app.use(bodyParser.json());
+// Enable CORS for all routes
+app.use('/*', cors());
 
 /**
  * Helper: Reads the SSE stream and resolves IMMEDIATELY 
@@ -28,7 +24,7 @@ async function readSSEStream(stream, expectedId = null) {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       
-      buffer = lines.pop(); // Keep the last incomplete line in the buffer
+      buffer = lines.pop();
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
@@ -65,14 +61,13 @@ async function fetchWithTimeout(url, options, timeoutMs = 30000) {
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
     return response;
-  } catch (err) {
+  } finally {
     clearTimeout(id);
-    throw err;
   }
 }
 
-// NEW: Endpoint to initialize a session for a specific client
-app.post('/init', async (req, res) => {
+// Endpoint to initialize a session
+app.post('/init', async (c) => {
   try {
     console.log('🔄 Initializing new client session...');
     const reqId = Date.now();
@@ -108,10 +103,10 @@ app.post('/init', async (req, res) => {
     if (result?.error) throw new Error(`Init failed: ${result.error.message}`);
     
     console.log(`✅ Session created: ${newSessionId}`);
-    res.json({ sessionId: newSessionId });
+    return c.json({ sessionId: newSessionId });
   } catch (error) {
     console.error('❌ Init error:', error.message);
-    res.status(500).json({ error: error.message });
+    return c.json({ error: error.message }, 500);
   }
 });
 
@@ -133,7 +128,7 @@ async function callMcp(toolName, args, sessionId) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream, application/json',
-        'mcp-session-id': sessionId, // Inject the client's specific ID
+        'mcp-session-id': sessionId,
         'User-Agent': 'ClaudeDesktop/1.0.0',
         'Origin': 'https://claude.ai',
         'Referer': 'https://claude.ai/'
@@ -153,36 +148,37 @@ async function callMcp(toolName, args, sessionId) {
   }
 }
 
-// Proxy endpoint (Now requires x-mcp-session-id header)
-app.post('/mcp', async (req, res) => {
+// Proxy endpoint
+app.post('/mcp', async (c) => {
   try {
-    const { tool, args } = req.body;
-    const sessionId = req.headers['x-mcp-session-id']; // Read ID from frontend
+    const { tool, args } = await c.req.json();
+    const sessionId = c.req.header('x-mcp-session-id');
 
     if (!sessionId) {
-      return res.status(401).json({ error: 'Missing session ID. Please initialize first.', isSessionError: true });
+      return c.json({ error: 'Missing session ID. Please initialize first.', isSessionError: true }, 401);
     }
     if (!tool) {
-      return res.status(400).json({ error: 'Missing "tool" field' });
+      return c.json({ error: 'Missing "tool" field' }, 400);
     }
 
     const result = await callMcp(tool, args || {}, sessionId);
-    res.json(result);
+    return c.json(result);
   } catch (error) {
     console.error('❌ Proxy error:', error.message);
-    // Detect if the error is due to an expired session
     const isSessionError = error.message.includes('session') || error.message.includes('-32000');
-    res.status(isSessionError ? 401 : 500).json({ error: error.message, isSessionError });
+    return c.json({ error: error.message, isSessionError }, isSessionError ? 401 : 500);
   }
 });
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', endpoint: MCP_ENDPOINT });
+app.get('/health', (c) => {
+  return c.json({ status: 'ok', endpoint: MCP_ENDPOINT });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Stateless Tafsir Proxy running on port ${PORT}`);
+// Root route
+app.get('/', (c) => {
+  return c.text('Tafsir MCP Proxy running on Cloudflare Workers');
 });
 
+// Export the Hono app for Cloudflare Workers
 export default app;
